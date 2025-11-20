@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berkley Grand Complication - Digital Twin Blueprint</title>
+    <style>
+        :root {
+            --neon-cyan: #00ffff;
+            --neon-gold: #ffd700;
+            --dark-bg: #050505;
+            --panel-bg: rgba(10, 10, 10, 0.9);
+            --text-color: #e0e0e0;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: var(--dark-bg);
+            font-family: 'Courier New', Courier, monospace; /* Blueprint aesthetic font */
+            overflow: hidden;
+        }
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; /* Behind UI */
+        }
+        /* Top Menu Specification: ~45px height, horizontal scroll */
+        #top-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 45px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--neon-cyan);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+            padding: 0 10px;
+            box-sizing: border-box;
+        }
+        /* Hide scrollbar for cleaner look but keep functionality */
+        #top-menu::-webkit-scrollbar { display: none; }
+        #top-menu { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 5px 15px;
+            margin-right: 10px;
+            cursor: pointer;
+            font-size: 12px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            flex-shrink: 0; /* Prevent squishing */
+        }
+        .nav-btn:hover {
+            background: rgba(0, 255, 255, 0.1);
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+        .nav-btn.active {
+            background: var(--neon-cyan);
+            color: var(--dark-bg);
+            box-shadow: 0 0 15px var(--neon-cyan);
+            font-weight: bold;
+        }
+
+        /* Bottom Panel Specification: Exactly 24vh height */
+        #bottom-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 24vh;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--neon-gold);
+            z-index: 10;
+            color: var(--text-color);
+            padding: 15px 20px;
+            box-sizing: border-box;
+            overflow-y: auto; /* Allow scrolling for long text */
+        }
+        #panel-title {
+            font-size: 16px;
+            color: var(--neon-gold);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px dotted var(--neon-gold);
+            display: inline-block;
+        }
+        #panel-desc {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #ccc;
+            max-width: 900px;
+        }
+        /* Custom scrollbar for bottom panel */
+        #bottom-panel::-webkit-scrollbar { width: 5px; }
+        #bottom-panel::-webkit-scrollbar-track { background: var(--dark-bg); }
+        #bottom-panel::-webkit-scrollbar-thumb { background: var(--neon-gold); }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="top-menu">
+        </div>
+
+    <div id="bottom-panel">
+        <div id="panel-title">Initializing Blueprint...</div>
+        <div id="panel-desc">Loading hyper-dense schematic data. Please wait.</div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+        // =========================================
+        // DATA & CONTENT DEFINITIONS (The 15 Modules)
+        // =========================================
+        const modulesData = [
+            {
+                title: "1. Full Assembly Schematic",
+                desc: "A holistic overview of the Berkley's unprecedented 2,877 individual components packed into a surprisingly wearable diameter. This view emphasizes the sheer density of the calibre 3750. The architecture represents a radical departure from traditional grand complications, utilizing a double-sided display and a highly stacked vertical integration of complication plates. We are viewing the aggregated wireframe of 63 complications, highlighting the challenges in energy management and spatial efficiency. The primary structural challenge here is maintaining rigidity across multiple stacked mainplates while allowing clearance for hundreds of interacting levers, cams, and gear trains operating on different temporal cycles, from fractions of a second to millennia.",
+                camTarget: { y: 0, z: 180 }
+            },
+            {
+                title: "2. Base Caliber & Energy",
+                desc: "The foundational layer powering the behemoth. Unlike standard movements, this base caliber utilizes a complex twin-barrel system designed not just for longevity (power reserve) but for consistent torque delivery across massive load variations caused by engaging complications. It features a specialized coaxial reversing gear system in the winding mechanism to maximize input efficiency. The escapement is a highly refined Swiss lever variant, optimized for stability under variable tension. The going train gears are redesigned with optimized tooth profiles to minimize friction, crucial when driving dozens of downstream indicators. We see the foundational plates and the primary energy transmission backbone here.",
+                camTarget: { y: 50, z: 80 }
+            },
+            {
+                title: "3. Chinese Perpetual Calendar",
+                desc: "An engineering marvel translating the lunisolar complexity of the traditional Chinese calendar into mechanical gearing. Unlike Gregorian calendars based on regular cycles, this mechanism must account for irregular months (29 or 30 days) and the insertion of leap months based on complex astronomical rules related to solar terms. It utilizes a massive, irregularly shaped program wheel (the 'brain') that completes a full Metonic cycle (19 years). Feelers read varying depths on this cam to determine month lengths and leap year status, driving indicators for Celestial Stems, Earthly Branches, and the zodiac animal, requiring entirely novel gear ratios unrelated to standard horology.",
+                camTarget: { y: 42, z: 70 }
+            },
+            {
+                title: "4. 3-Axis Armillary Tourbillon",
+                desc: "Visualized here is the regulator operating in three spatial dimensions. The tourbillon cages rotate on three orthogonal axes at different speeds (e.g., 60s, 24s, and 18s cycles) to average out gravitational errors regardless of the watch's orientation. This requires a nested cage architecture and a complex spherical differential gear system to transmit power to the innermost balance wheel while allowing the surrounding structures to tumble freely. The balance spring is spherical, breathing concentrically to further improve isochronism. The entire assembly is a study in lightweight metallurgy to minimize inertia.",
+                camTarget: { y: 35, z: 60 }
+            },
+            {
+                title: "5. Westminster Carillon Chime",
+                desc: "The auditory engine of the watch. This module highlights the rack-and-snail striking mechanism configured for the Westminster quarters. It utilizes five distinct gongs and five hammers, tuned precisely to mimic the notes of Big Ben. TheGrande Sonnerie capability means it automatically strikes hours and quarters in passing. The complexity lies in the 'surprise piece' and locking mechanisms that prevent mis-strikes during transition periods, and the centrifugal governor (visible as rapidly spinning weights) that regulates the speed of the strike train to ensure rhythmic, clear acoustic output.",
+                camTarget: { y: 28, z: 70 }
+            },
+            {
+                title: "6. Celestial Chart & Sidereal Time",
+                desc: "A miniaturized planetarium on the reverse face. This mechanism is driven by a gear train calculated to sidereal time (star time), which runs approximately four minutes faster per day than mean solar time. The primary output is a rotating sapphire disc representing the night sky visible from a specific latitude (likely Geneva or Shanghai). The gearing achieves incredible precision, often utilizing ratios like 365.25:366.25 relative to the base movement. It shows the horizon, celestial equator, and the apparent position of major constellations relative to the observer.",
+                camTarget: { y: 20, z: 65 }
+            },
+            {
+                title: "7. Precision Moonphase (1027-Year)",
+                desc: "Far exceeding standard 29.5-day lunar movements, this astronomical complication achieves an error rate of only one day in 1,027 years. This is achieved through a highly complex reduction gear train containing wheels with prime number tooth counts (e.g., 13, 59, 137) to approximate the synodic month (29 days, 12 hours, 44 minutes, 2.8 seconds) with extreme mathematical fidelity. The visual output is often a realistic sphere or disc, but the internal mechanism visualized here is a dense cluster of fine-toothed gears moving almost imperceptibly slow relative to the seconds hand.",
+                camTarget: { y: 12, z: 60 }
+            },
+            {
+                title: "8. Retrograde Date Mechanism",
+                desc: "A high-energy complication where the date indicator snaps back to '1' after reaching '31'. This is governed by a snail cam rotating once per month and a spring-loaded rack geared to the hand. As the month progresses, the rack climbs the cam's gradual slope. At the end of the month, the rack's feeler drops off the sharp cliff of the cam, and the integrated spring forces the instantaneous flyback. The challenge here is shock management; the sudden release of energy must be damped to prevent damage to the hand or gear teeth.",
+                camTarget: { y: 5, z: 55 }
+            },
+            {
+                title: "9. Split-Seconds Chronograph",
+                desc: "The Rattrapante. This module visualizes the two superimposed seconds hands and the complex clamp mechanism separating them. It features two column wheels: one for standard start/stop/reset, and a secondary one for the split function. When activated, pincer-like clamps (visible here) grab the split-seconds wheel, stopping its hand while the main chronograph hand continues. Releasing the clamp allows the split hand to instantly catch up, driven by a ruby roller and a heart-shaped cam designed for near-frictionless reunion. This requires immense precision in the tensioning of the clamp springs.",
+                camTarget: { y: 0, z: 60 }
+            },
+            {
+                title: "10. Equation of Time",
+                desc: "This mechanism displays the difference between 'apparent solar time' (sundial time) and 'mean solar time' (clock time), which varies from -16 to +14 minutes throughout the year due to the earth's elliptical orbit and axial tilt. It relies centrally on an irregularly shaped 'kidney cam' that rotates once per year. A feeler arm traces the perimeter of this cam, translating its varying radius into a linear displacement that advances or retards a secondary minute hand (or a +/- scale) relative to the main timekeeping train.",
+                camTarget: { y: -8, z: 55 }
+            },
+            {
+                title: "11. Gregorian Perpetual Calendar",
+                desc: "While less complex than the Chinese counterpart, the Gregorian perpetual is still a mechanical computer. It mechanically accounts for 30/31 day months and the standard 4-year leap year cycle. It utilizes a 48-month program wheel (a cam with notches of varying depths representing month lengths) and a satellite wheel that performs a quarter-turn every year to track the leap year cycle. The mechanism must generate enough force at midnight on month-end to jump multiple indicators simultaneously (day, date, month, maybe year) without stalling the base movement.",
+                camTarget: { y: -15, z: 60 }
+            },
+            {
+                title: "12. Sunrise/Sunset Indicator",
+                desc: "Specific to a pre-defined latitude, this mechanism calculates the varying length of daylight throughout the year. Similar to the Equation of Time, it uses yearly cams. However, these cams are often conical or three-dimensional to account for the complex trigonometric relationship between the day of the year and the observer's latitude. Feeler arms riding on these cams drive retrograde hands or sliding horizons on the dial, indicating the local moments the sun crosses the horizon line.",
+                camTarget: { y: -22, z: 65 }
+            },
+            {
+                title: "13. World Time System",
+                desc: "A complication allowing instantaneous reading of time in 24 time zones simultaneously. It typically involves a rotating outer ring with 24 reference cities and an inner 24-hour ring counter-rotating (or rotating at half speed relative to the hour hand). The engineering challenge is the switching mechanism that allows the user to jump the local hour hand in one-hour increments (usually via a pusher) while simultaneously rotating the city ring, without disturbing the underlying minute and second precision timekeeping.",
+                camTarget: { y: -30, z: 70 }
+            },
+            {
+                title: "14. Alarm Mechanism",
+                desc: "An independent complication with its own power source. This module visualizes a separate mainspring barrel dedicated solely to the alarm function, ensuring that a long alarm ring does not deplete the watch's timekeeping power reserve. It features its own escapement (often a simple anchor recoil) and a hammer striking a dedicated gong or the case interior. The trigger mechanism involves a cam linked to the alarm setting hand that releases the alarm train gear when coincident with the current time.",
+                camTarget: { y: -38, z: 75 }
+            },
+            {
+                title: "15. Function Selector & Crown",
+                desc: "The user interface hub. Instead of pulling the crown to different unstable positions, this complex transmission system uses a column wheel (similar to a chronograph) operated by a pusher in the crown. Clicking the pusher rotates the column wheel, engaging different intermediate levers that route the crown's rotation to either winding, time-setting, or calendar adjustment geartrains. We see the intricate clutch levers and the castle wheel interface that manages these different modes reliably.",
+                camTarget: { y: -45, z: 80 }
+            }
+        ];
+
+        // =========================================
+        // THREE.JS SETUP (Fail-Safe Rendering)
+        // =========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505); // Pure black background
+
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 200); // Initial start position
+
+        // Renderer setup (No anti-alias needed for wireframe aesthetic, helps performance)
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio for performance
+        container.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.8;
+        controls.enablePan = false; // Keep focus on center
+        controls.minDistance = 20;
+        controls.maxDistance = 300;
+
+        // =========================================
+        // MATERIAL SYSTEM (Safe-Render: Basic & LineOnly)
+        // =========================================
+        const neonCyan = 0x00ffff;
+        const neonGold = 0xffd700;
+        const darkGrey = 0x333333;
+
+        // Active Materials (Selected Module)
+        const matActiveLine = new THREE.LineBasicMaterial({ color: neonCyan, transparent: true, opacity: 0.8, linewidth: 1 });
+        const matActiveMesh = new THREE.MeshBasicMaterial({ color: neonCyan, wireframe: true, transparent: true, opacity: 0.15 });
+        // Accent for active
+        const matActiveAccentLine = new THREE.LineBasicMaterial({ color: neonGold, transparent: true, opacity: 1 });
+
+        // Inactive Materials (Background Modules)
+        const matInactiveLine = new THREE.LineBasicMaterial({ color: darkGrey, transparent: true, opacity: 0.08 });
+        const matInactiveMesh = new THREE.MeshBasicMaterial({ color: 0x111111, wireframe: true, transparent: true, opacity: 0.02 });
+
+        // =========================================
+        // PROCEDURAL GENERATION (Hyper-Dense Blueprint)
+        // =========================================
+        const moduleGroups = []; // Store the 15 module 3D groups here
+
+        // Helper: Create a generic gear cluster component
+        function createGearCluster(yOffset, complexity, radiusScale) {
+            const group = new THREE.Group();
+            
+            // Main Gear (Torus for rim, Cylinder for hub)
+            const torusGeo = new THREE.TorusGeometry(radiusScale * 5, radiusScale * 0.5, 8, 32);
+            const gearRim = new THREE.LineSegments(new THREE.WireframeGeometry(torusGeo), matInactiveLine);
+            
+            const cylGeo = new THREE.CylinderGeometry(radiusScale * 1, radiusScale * 1, 1, 16);
+            const gearHub = new THREE.Mesh(cylGeo, matInactiveMesh);
+
+            group.add(gearRim);
+            group.add(gearHub);
+
+            // Add spokes/complex internal structures based on complexity
+            for (let i = 0; i < complexity; i++) {
+                const angle = (i / complexity) * Math.PI * 2;
+                const spokeLen = radiusScale * 4.5;
+                const spokeGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(Math.cos(angle) * spokeLen, Math.sin(angle) * spokeLen, (Math.random() - 0.5) * 2)
+                ]);
+                const spoke = new THREE.Line(spokeGeo, matInactiveLine);
+                group.add(spoke);
+                
+                // Add smaller satellite gears/cams
+                if (Math.random() > 0.5) {
+                    const satRad = radiusScale * (0.5 + Math.random());
+                    const satGeo = new THREE.TorusGeometry(satRad, satRad*0.2, 6, 16);
+                    const satGear = new THREE.LineSegments(new THREE.WireframeGeometry(satGeo), matInactiveLine);
+                    satGear.position.set(Math.cos(angle) * spokeLen * 0.7, Math.sin(angle) * spokeLen * 0.7, (Math.random() -0.5)*3);
+                    group.add(satGear);
+                }
+            }
+            
+            group.position.y = yOffset;
+            // Random slight rotations for natural dense look
+            group.rotation.x = (Math.random() - 0.5) * 0.2;
+            group.rotation.z = (Math.random() - 0.5) * 0.2;
+            return group;
+        }
+
+        // Generate the 15 Modules
+        // We stack them along the Y axis, compressing the spacing to make it dense.
+        const totalHeightSpan = 120;
+        const yStep = totalHeightSpan / modulesData.length;
+
+        for (let i = 0; i < modulesData.length; i++) {
+            const moduleGroup = new THREE.Group();
+            // Calculate a Y position centered around 0. Top modules positive Y, bottom negative Y.
+            // Offset index 0 (Full Assembly) slightly differently or make it encompass everything. Let's make index 0 the center point.
+            let currentY = (modulesData.length / 2 - i) * yStep * 0.7; // 0.7 compression factor
+
+            // Add multiple sub-clusters per module to increase density
+            const subClusters = 3 + Math.floor(Math.random() * 4); // 3 to 6 clusters per module
+            for(let j=0; j<subClusters; j++) {
+                 // Vary Y slightly within the module layer
+                const subY = currentY + (Math.random() - 0.5) * yStep * 0.8;
+                // Vary complexity and size
+                const complexity = 8 + Math.floor(Math.random() * 12);
+                const scale = 0.5 + Math.random() * 1.5;
+                const cluster = createGearCluster(subY, complexity, scale);
+                moduleGroup.add(cluster);
+            }
+
+            // Add connecting vertical shafts (lines) to enhance density visual
+            for(let k=0; k<5; k++) {
+                const shaftGeo = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3((Math.random()-0.5)*30, currentY - yStep/2, (Math.random()-0.5)*30),
+                    new THREE.Vector3((Math.random()-0.5)*30, currentY + yStep/2, (Math.random()-0.5)*30)
+                ]);
+                moduleGroup.add(new THREE.Line(shaftGeo, matInactiveLine));
+            }
+
+            moduleGroup.userData.moduleId = i; // Store ID for click detection
+            scene.add(moduleGroup);
+            moduleGroups.push(moduleGroup);
+        }
+
+        // =========================================
+        // INTERACTION LOGIC & UI
+        // =========================================
+        let activeIndex = 0; // Start with Full Assembly
+        const targetCameraPos = new THREE.Vector3();
+        const targetLookAt = new THREE.Vector3(0,0,0); // Always look at center spine
+
+        const topMenu = document.getElementById('top-menu');
+        const panelTitle = document.getElementById('panel-title');
+        const panelDesc = document.getElementById('panel-desc');
+
+        // Function to update the active state
+        function setActiveModule(index) {
+            activeIndex = index;
+
+            // 1. Update UI Buttons
+            document.querySelectorAll('.nav-btn').forEach((btn, idx) => {
+                if (idx === index) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            // 2. Update Bottom Panel text content
+            panelTitle.textContent = modulesData[index].title;
+            panelDesc.textContent = modulesData[index].desc;
+            // Reset scroll position of bottom panel
+            document.getElementById('bottom-panel').scrollTop = 0;
+
+            // 3. Set Camera Target
+            targetCameraPos.set(0, modulesData[index].camTarget.y, modulesData[index].camTarget.z);
+
+            // 4. Update 3D Materials (Highlight active, dim others)
+            moduleGroups.forEach((group, idx) => {
+                const isActive = (idx === index || index === 0); // Index 0 highlights everything slightly
+                
+                group.traverse((child) => {
+                    if (child.isLineSegments || child.isLine) {
+                        child.material = isActive ? (Math.random() > 0.8 ? matActiveAccentLine : matActiveLine) : matInactiveLine;
+                         // Index 0 (Full Assembly) gets a slightly dimmed active state so it's not overwhelming
+                        if(index === 0 && isActive) child.material.opacity = 0.4;
+                        if(index !== 0 && isActive) child.material.opacity = 0.8;
+
+                    } else if (child.isMesh) {
+                        child.material = isActive ? matActiveMesh : matInactiveMesh;
+                         // Index 0 adjustment
+                        if(index === 0 && isActive) child.material.opacity = 0.08;
+                        if(index !== 0 && isActive) child.material.opacity = 0.15;
+                    }
+                });
+            });
+        }
+
+        // Generate UI Buttons dynamically
+        modulesData.forEach((data, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'nav-btn';
+            // Shorten title for button if too long
+            let shortTitle = data.title.split(':')[0]; 
+            if(shortTitle.length > 25) shortTitle = shortTitle.substring(0, 22) + "...";
+            btn.textContent = shortTitle;
+            
+            btn.addEventListener('click', () => {
+                setActiveModule(index);
+            });
+            topMenu.appendChild(btn);
+        });
+
+        // Initialize state
+        setActiveModule(0);
+
+        // =========================================
+        // ANIMATION LOOP & RESIZE
+        // =========================================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            controls.update(); // Required for damping
+
+            // Smooth Camera Interpolation (Lerp)
+            // We lerp the position and the controls target (where it looks)
+            camera.position.lerp(targetCameraPos, 4 * delta);
+            
+            // Slight constant rotation for dynamic feel
+            scene.rotation.y += 0.05 * delta;
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate(); // Start loop
+    </script>
+</body>
+</html>
