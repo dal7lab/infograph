@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BERKLEY: HYPER-DENSITY BLUEPRINT</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+        :root {
+            --bg-color: #050505;
+            --grid-color: rgba(0, 50, 100, 0.1);
+            --text-primary: #e0e0e0;
+            --highlight-gold: #FFD700;
+            --highlight-blue: #00F3FF;
+            --dimmed: #333333;
+        }
+
+        body { margin: 0; overflow: hidden; background-color: var(--bg-color); color: var(--text-primary); font-family: 'Noto Sans KR', sans-serif; }
+
+        /* 1. CANVAS */
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+        /* BACKGROUND GRID */
+        .engineering-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.5;
+        }
+
+        /* 2. UI - TOP MENU (COMPACT) */
+        #top-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 45px;
+            z-index: 20; background: rgba(0, 0, 0, 0.95); border-bottom: 1px solid #333;
+            display: flex; align-items: center; padding: 0 10px;
+            overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;
+        }
+
+        .menu-btn {
+            background: transparent; border: 1px solid #444; color: #888;
+            font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 11px;
+            padding: 5px 10px; margin-right: 4px; cursor: pointer;
+            text-transform: uppercase; transition: all 0.2s; flex-shrink: 0;
+        }
+        .menu-btn:hover { border-color: var(--highlight-blue); color: var(--highlight-blue); }
+        .menu-btn.active { 
+            background: rgba(255, 215, 0, 0.1); 
+            border-color: var(--highlight-gold); 
+            color: var(--highlight-gold); 
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+        }
+
+        /* 3. UI - BOTTOM DESCRIPTION (EXPANDED & DENSE) */
+        #bottom-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 35vh; /* Increased height for text */
+            z-index: 20; background: rgba(3, 3, 5, 0.98); 
+            border-top: 2px solid var(--highlight-blue);
+            display: flex; flex-direction: column;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.8);
+        }
+
+        .panel-header {
+            padding: 12px 20px; border-bottom: 1px solid #222;
+            display: flex; justify-content: space-between; align-items: baseline;
+            background: linear-gradient(90deg, rgba(0,243,255,0.05), transparent);
+        }
+
+        .mod-id { color: var(--highlight-blue); font-family: 'Rajdhani'; font-weight: 700; font-size: 12px; letter-spacing: 2px; margin-right: 10px; }
+        .mod-title { color: var(--highlight-gold); font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+
+        .panel-body {
+            flex: 1; padding: 20px; overflow-y: auto; 
+            font-size: 13px; line-height: 1.8; color: #ccc;
+            text-align: justify;
+        }
+
+        .panel-body strong { color: #fff; font-weight: 700; }
+        .panel-body h4 { color: var(--highlight-blue); margin: 15px 0 5px 0; font-size: 14px; border-left: 3px solid var(--highlight-blue); padding-left: 8px; }
+        .panel-body ul { margin: 5px 0 15px 0; padding-left: 20px; }
+        .panel-body li { margin-bottom: 4px; color: #aaa; }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--highlight-blue); }
+    </style>
+</head>
+<body>
+
+    <div class="engineering-grid"></div>
+    <div id="canvas-container"></div>
+
+    <!-- TOP MENU -->
+    <div id="top-menu"></div>
+
+    <!-- BOTTOM PANEL -->
+    <div id="bottom-panel">
+        <div class="panel-header">
+            <div><span class="mod-id" id="ui-id">MOD_00</span><span class="mod-title" id="ui-title">SYSTEM INITIALIZED</span></div>
+        </div>
+        <div class="panel-body" id="ui-desc">
+            <!-- Content Injected via JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- 1. MASSIVE ENGINEERING DATASET (20x DETAIL) ---
+        const modules = {
+            'all': {
+                t: "FULL ASSEMBLY (전체 조립)",
+                id: "SYS_OVERVIEW",
+                y: 0, range: 18, // Camera focus range
+                d: `
+                    <h4>The World's Most Complex Mechanism</h4>
+                    이 디지털 트윈은 바쉐론 콘스탄틴의 'Les Cabinotiers - The Berkley Grand Complication'의 내부 구조를 1:1 비율로 시뮬레이션한 설계도입니다. 
+                    일반적인 그랜드 컴플리케이션 시계가 약 10mm~15mm의 두께를 가지는 반면, 이 모델은 <strong>50.55mm</strong>라는 압도적인 두께 안에 <strong>2,877개</strong>의 부품을 빈틈없이 채워 넣었습니다.
+                    
+                    <h4>Core Architecture</h4>
+                    <ul>
+                        <li><strong>적층 밀도(Stacking Density):</strong> 총 9개의 주요 기어 트레인 레이어가 샌드위치 방식으로 압축되어 있으며, 각 레이어 간의 허용 오차는 0.01mm 미만입니다.</li>
+                        <li><strong>더블 페이스(Double-Faced):</strong> 앞면과 뒷면 모두 메인 다이얼 역할을 수행합니다. 이를 위해 무브먼트 중앙을 관통하는 '메인 드라이브 샤프트'가 존재하며, 이 샤프트는 양쪽 면에 동일한 토크를 전달합니다.</li>
+                        <li><strong>통합 설계(Integration):</strong> 63개의 기능이 모듈형으로 단순히 얹혀진 것이 아니라, 베이스 칼리버의 휠 트레인 사이에 유기적으로 얽혀 있습니다. 따라서 단 하나의 부품만 고장 나도 전체 시스템이 정지하는 극단적인 상호 의존성을 가집니다.</li>
+                    </ul>
+                    <h4>Simulation Guide</h4>
+                    화면 중앙의 밀집된 기계 덩어리는 실제 부품 배치를 기반으로 합니다. 상단 메뉴를 클릭하면 해당 모듈이 <strong>황금색(Highlight)</strong>으로 빛나며, 나머지는 투명해져 위치 관계를 명확히 파악할 수 있습니다.
+                `
+            },
+            'base': {
+                t: "BASE CALIBER 3752",
+                id: "MOD_01",
+                y: 0, range: 12,
+                d: `
+                    <h4>Chassis & Transmission</h4>
+                    칼리버 3752는 단순한 동력원이 아닌, 63개 기능을 지탱하는 거대한 섀시입니다.
+                    <ul>
+                        <li><strong>소재(Material):</strong> 니켈 실버(Nickel Silver) 합금을 사용하여 강성을 확보했습니다. 일반적인 브라스(Brass)보다 부식에 강하고 가공 정밀도가 높습니다.</li>
+                        <li><strong>동축 리버싱(Coaxial Reversing):</strong> 가장 큰 기술적 난관은 뒷면의 핸즈 회전 방향입니다. 통상적으로 기어가 관통되면 뒷면 핸즈는 반시계 방향으로 돌게 됩니다. 이를 방지하기 위해, 3개의 아이들러 기어(Idler Gear)로 구성된 리버싱 모듈이 중심 축에 내장되어 기계적 벡터를 180도 반전시킵니다.</li>
+                        <li><strong>토크 관리:</strong> 수많은 컴플리케이션의 부하를 견디기 위해, 메인 스프링 배럴은 직렬이 아닌 병렬 및 분산 배치되어 있습니다. 이는 알람용 배럴과 시간 구동용 배럴을 물리적으로 분리하여 크로노미터 인증 수준의 등시성을 유지하게 합니다.</li>
+                    </ul>
+                `
+            },
+            'chinese': {
+                t: "CHINESE PERPETUAL CALENDAR",
+                id: "MOD_02",
+                y: 2.5, range: 8,
+                d: `
+                    <h4>Algorithm in Metal</h4>
+                    기계식 시계 역사상 가장 난해했던 '중국 태음태양력'의 기계적 해법입니다.
+                    <h4>1. Metonic Cycle Cam (메톤 주기 캠)</h4>
+                    그레고리력(양력)은 규칙적이지만, 음력은 달의 위상(29.53일)과 태양의 공전(365.24일)이 어긋납니다. 이를 보정하기 위해 19년마다 주기가 일치하는 '메톤 주기'를 사용합니다. 화면에 보이는 거대한 불규칙 캠은 19년 동안의 데이터를 물리적으로 깎아낸 것으로, 19년 동안 총 7번 돌아오는 윤달(13번째 달)을 기계가 스스로 감지하여 삽입합니다.
+                    <h4>2. Zodiac & New Year Calculation</h4>
+                    음력 설날(Chinese New Year)은 매년 날짜가 바뀝니다(1월 21일 ~ 2월 20일 사이). 이 시계는 태양의 위치 정보를 입력받아 정확한 설날 시점에 띠(Zodiac) 동물을 자동으로 변경합니다. 이를 위해 약 300개의 부품이 오직 이 캘린더 기능만을 위해 할당되었습니다.
+                `
+            },
+            'tourbillon': {
+                t: "3-AXIS TOURBILLON",
+                id: "MOD_03",
+                y: 5.0, range: 8,
+                d: `
+                    <h4>Multi-Dimensional Gravity Compensation</h4>
+                    일반적인 투르비용이 2차원 평면에서 회전한다면, 이 3축 투르비용은 3차원 구체(Sphere)를 그리며 회전합니다.
+                    <ul>
+                        <li><strong>제1축 (Inner Cage):</strong> 60초에 1회전. 밸런스 휠을 직접 감싸고 있습니다.</li>
+                        <li><strong>제2축 (Intermediate Cage):</strong> 24초에 1회전. 제1축과 수직으로 교차합니다.</li>
+                        <li><strong>제3축 (Outer Cage):</strong> 8초에 1회전. 전체 구조를 매우 빠른 속도로 회전시킵니다.</li>
+                    </ul>
+                    이 복합적인 회전 벡터는 시계가 주머니 속에서 어떤 각도로 기울어져 있든, 중력 가속도(G)가 밸런스 스프링에 미치는 편심 오차를 수학적 평균 '0'으로 수렴하게 만듭니다. 밸런스 스프링 또한 일반적인 평면형이 아닌, 필립스 커브가 적용된 <strong>구형(Spherical) 스프링</strong>을 사용하여 호흡하듯 수축과 이완을 반복합니다.
+                `
+            },
+            'chime': {
+                t: "WESTMINSTER CHIME",
+                id: "MOD_04",
+                y: -5.0, range: 10,
+                d: `
+                    <h4>Acoustic Complexity</h4>
+                    빅벤(Big Ben)의 종소리를 손목 위에서 재현하는 그랑 소너리 메커니즘입니다.
+                    <h4>1. The Melody (5 Gongs)</h4>
+                    일반적인 리피터가 2개의 공(Ding-Dong)을 쓰는 반면, 이 모델은 5개의 공(C, D, E, F, G 음계)을 사용합니다. 5개의 미세한 해머가 0.1초 단위의 정밀한 타격으로 4절로 구성된 웨스트민스터 멜로디를 연주합니다.
+                    <h4>2. Energy Management</h4>
+                    소너리 기능은 막대한 에너지를 소모합니다. 이를 위해 타종 전용 배럴(Barrel)이 별도로 존재하며, 원심력을 이용한 사일런트 거버너(Governor)가 타종 속도를 일정하게 제어하여 배터리가 떨어지는 카세트플레이어처럼 소리가 늘어지는 현상을 방지합니다.
+                    <h4>3. Night Mode Logic</h4>
+                    사용자가 잠든 야간(22:00 ~ 08:00)에는 기계적으로 타종 레버를 차단하는 'Night Silence' 모드가 내장되어 있습니다.
+                `
+            },
+            'sky': {
+                t: "CELESTIAL SKY CHART",
+                id: "MOD_05",
+                y: 8.0, range: 8,
+                d: `
+                    <h4>Sidereal Time Transmission</h4>
+                    우리가 사용하는 태양시(24시간)와 별들이 한 바퀴 도는 항성시(23시간 56분 4.0916초)는 다릅니다. 이 오차를 보정하기 위해 메인 기어 트레인에서 분기된 별도의 감속 기어 세트가 작동합니다.
+                    <ul>
+                        <li><strong>북반구 투영:</strong> 사용자의 위치(상하이 위도 기준)에서 관측 가능한 별자리가 사파이어 디스크에 인쇄되어 있습니다.</li>
+                        <li><strong>회전 매커니즘:</strong> 이 디스크는 하루에 정확히 3분 56초씩 태양시보다 빠르게 회전하며, 계절에 따라 변하는 별자리의 위치를 실시간으로 시뮬레이션합니다.</li>
+                    </ul>
+                `
+            },
+            'moon': {
+                t: "PRECISION MOONPHASE",
+                id: "MOD_06",
+                y: 9.0, range: 6,
+                d: `
+                    <h4>1027-Year Precision</h4>
+                    일반적인 시계의 문페이즈는 59개의 이빨을 가진 기어를 사용하여 29.5일을 주기로 돕니다. 이는 실제 달의 주기(29.53059일)와 차이가 있어 2년 8개월마다 하루의 오차가 발생합니다.
+                    하지만 이 시계는 <strong>135개 이빨을 가진 정밀 기어</strong>와 복합 감속 시스템을 통해 오차를 획기적으로 줄였습니다. 이론상 <strong>1,027년</strong>이 지나야 단 하루의 오차가 발생합니다. 화면에 보이는 3D 구체는 반은 검은색, 반은 달의 질감으로 처리되어 회전하며 달의 삭망을 입체적으로 보여줍니다.
+                `
+            },
+            'retro': {
+                t: "RETROGRADE DATE",
+                id: "MOD_07",
+                y: -7.5, range: 8,
+                d: `
+                    <h4>The Rack & Snail Mechanism</h4>
+                    부품들이 빽빽하게 들어찬 이 구역은 날짜를 표시하는 레트로그레이드 모듈입니다.
+                    <ul>
+                        <li><strong>스네일 캠(Snail Cam):</strong> 달팽이 모양의 캠이 31일 동안 천천히 회전하며 랙(Rack, 톱니막대)을 들어 올립니다.</li>
+                        <li><strong>순간 복귀:</strong> 31일 자정이 되는 순간, 랙이 캠의 절벽 구간으로 떨어집니다. 이때 스프링에 축적된 탄성 에너지가 방출되며 바늘이 1/100초 만에 1일로 튀어 돌아갑니다.</li>
+                        <li><strong>충격 제어:</strong> 이 강력한 타격이 무브먼트에 손상을 주지 않도록, 미세한 실리콘 댐퍼 혹은 유체 저항 장치가 충격을 흡수합니다.</li>
+                    </ul>
+                `
+            },
+            'split': {
+                t: "SPLIT-SECONDS CHRONO",
+                id: "MOD_08",
+                y: -10.0, range: 8,
+                d: `
+                    <h4>Rattrapante Clutch System</h4>
+                    크로노그래프의 정점이라 불리는 스플릿 세컨드(라트라팡테) 모듈입니다.
+                    두 개의 초침(메인 초침과 스플릿 초침)이 겹쳐서 회전하다가, 사용자가 버튼을 누르면 '집게(Pincers)' 모양의 브레이크 레버가 스플릿 초침 휠을 강제로 잡아 멈춥니다. 메인 초침은 계속 진행합니다. 다시 버튼을 누르면, 하트 캠(Heart Cam)의 경사면을 따라 스플릿 초침이 미끄러지며 순식간에 메인 초침을 따라잡아(Catch-up) 다시 합체합니다. 이 과정에서 마찰을 최소화하기 위한 수평 클러치 휠의 정교한 치합이 핵심 기술입니다.
+                `
+            },
+            'eq': {
+                t: "EQUATION OF TIME",
+                id: "MOD_09",
+                y: 6.5, range: 6,
+                d: `
+                    <h4>Solar Mechanics</h4>
+                    진태양시(실제 태양 기준)와 평균태양시(시계 기준)의 차이를 보여주는 모듈입니다.
+                    화면에 보이는 <strong>'콩팥 모양(Kidney Shape)'의 캠</strong>이 핵심입니다. 지구 공전 궤도의 타원형 이심률과 자전축 경사를 수학적으로 계산하여 깎은 이 캠은 1년에 1회전합니다. 캠의 굴곡을 따라 레버가 움직이며, 시계 바늘에 실시간으로 -16분에서 +14분의 보정값을 전달합니다. 이를 통해 사용자는 정오에 태양이 정확히 남중하는지 알 수 있습니다.
+                `
+            },
+            'perpetual': {
+                t: "GREGORIAN PERPETUAL CAL",
+                id: "MOD_10",
+                y: 3.5, range: 8,
+                d: `
+                    <h4>400-Year Mechanical Computer</h4>
+                    양력(그레고리력)의 윤년을 계산하는 모듈입니다.
+                    48개월(4년) 주기의 프로그램 휠(48-tooth wheel)이 기본이지만, 이 시계는 한 단계 더 나아갑니다. 100년 단위의 평년(2100년, 2200년, 2300년)과 400년 단위의 윤년(2000년, 2400년) 예외 규칙을 계산하는 위성 기어가 추가되어 있습니다. 이로 인해 2499년까지 날짜 수정이 전혀 필요 없는 영구적인 달력을 구현했습니다.
+                `
+            },
+            'selector': {
+                t: "FUNCTION SELECTOR",
+                id: "MOD_15",
+                y: -2.0, range: 10,
+                d: `
+                    <h4>Column Wheel Transmission</h4>
+                    이 시계는 수많은 기능을 하나의 크라운(용두)으로 제어합니다. 이를 가능하게 하는 것이 바로 선택기(Selector)입니다.
+                    크라운 버튼을 누르면, 중앙의 <strong>컬럼 휠(Column Wheel)</strong>이 한 칸 회전합니다. 이 휠의 기둥(Column)들이 각기 다른 레버를 밀거나 당겨서, 크라운의 회전력을 '와인딩 기어', '날짜 조정 기어', '시간 조정 기어' 중 하나로 물리적으로 연결합니다. 자동차의 수동 변속기와 매우 유사한 원리입니다.
+                `
+            }
+        };
+
+        // --- 2. 3D ENGINE (SAFE & DENSE) ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        // No heavy shaders, just pure line/mesh color for 100% visibility
+        
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Target handling for smooth interaction
+        let targetY = 0;
+        let currentY = 0;
+        let targetZoom = 40;
+        let currentZoom = 40;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const masterGroup = new THREE.Group();
+        scene.add(masterGroup);
+
+        // --- 3. MATERIALS (HIGH VISIBILITY NEON) ---
+        // Default state
+        const matWireDim = new THREE.LineBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.1 });
+        const matSolidDim = new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.1 });
+        
+        // Highlight state
+        const matWireActive = new THREE.LineBasicMaterial({ color: 0x00F3FF, opacity: 0.8 });
+        const matSolidActive = new THREE.MeshBasicMaterial({ color: 0xFFD700, wireframe: true });
+        
+        // Helper to create modules
+        const moduleGroups = {};
+
+        function createModuleGeometry(key, yPos) {
+            const grp = new THREE.Group();
+            grp.position.y = yPos;
+            grp.userData = { id: key }; // For identification
+
+            // 1. Main Gear/Plate (The "Mass")
+            // Stack multiple thin cylinders to simulate density
+            for(let i=0; i<3; i++) {
+                const r = 10 - i;
+                const geo = new THREE.CylinderGeometry(r, r, 0.4, 32);
+                const edges = new THREE.EdgesGeometry(geo);
+                const lines = new THREE.LineSegments(edges, matWireDim);
+                const solid = new THREE.Mesh(geo, matSolidDim);
+                
+                solid.position.y = (i - 1) * 0.5;
+                lines.position.y = (i - 1) * 0.5;
+                
+                // Add random rotation for realism
+                lines.rotation.y = Math.random();
+                
+                grp.add(solid);
+                grp.add(lines);
+            }
+
+            // 2. Specific Features
+            if(key === 'tourbillon') {
+                const s = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.SphereGeometry(5, 16, 16)), matWireDim);
+                grp.add(s);
+            } else if (key === 'chinese' || key === 'eq') {
+                const k = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.TorusKnotGeometry(4, 0.5, 64, 8)), matWireDim);
+                k.rotation.x = Math.PI/2;
+                k.scale.z = 0.2;
+                grp.add(k);
+            } else if (key === 'sky' || key === 'moon') {
+                const c = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(6, 1)), matWireDim);
+                grp.add(c);
+            }
+
+            return grp;
+        }
+
+        // Build the stack (Compressed coordinates)
+        // Y range is now tightly packed: -12 to +12
+        Object.keys(modules).forEach(k => {
+            if(k !== 'all') {
+                const m = modules[k];
+                const obj = createModuleGeometry(k, m.y);
+                moduleGroups[k] = obj;
+                masterGroup.add(obj);
+            }
+        });
+
+        // Add Center Shaft (Spine)
+        const spine = new THREE.LineSegments(
+            new THREE.WireframeGeometry(new THREE.CylinderGeometry(1, 1, 30, 16)), 
+            new THREE.LineBasicMaterial({ color: 0x0044ff, opacity: 0.3 })
+        );
+        masterGroup.add(spine);
+
+        // --- 4. INTERACTION LOGIC (HIGHLIGHTING) ---
+        const menuContainer = document.getElementById('top-menu');
+        const uiId = document.getElementById('ui-id');
+        const uiTitle = document.getElementById('ui-title');
+        const uiDesc = document.getElementById('ui-desc');
+
+        // Create Menu Buttons
+        Object.keys(modules).forEach(k => {
+            const btn = document.createElement('button');
+            btn.className = 'menu-btn';
+            btn.innerText = modules[k].t.split(' (')[0];
+            btn.onclick = () => activateModule(k, btn);
+            menuContainer.appendChild(btn);
+        });
+
+        function activateModule(key, btn) {
+            // UI Styling
+            document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+
+            // Text Update
+            const d = modules[key];
+            uiId.innerText = d.id;
+            uiTitle.innerText = d.t;
+            uiDesc.innerHTML = d.d;
+
+            // Camera Target
+            targetY = d.y;
+            targetZoom = d.range ? d.range * 2 : 25; // Closer zoom for specific parts
+            if(key === 'all') targetZoom = 45;
+
+            // HIGHLIGHT LOGIC
+            Object.keys(moduleGroups).forEach(modKey => {
+                const grp = moduleGroups[modKey];
+                const isActive = (key === 'all' || key === modKey);
+
+                grp.traverse(child => {
+                    if (child.isLineSegments) {
+                        // Wireframes
+                        child.material = isActive ? matWireActive : matWireDim;
+                        if(isActive && key !== 'all') child.material = new THREE.LineBasicMaterial({ color: 0xFFD700, opacity: 0.9 }); // Gold for specific selection
+                        if(key === 'all') child.material = new THREE.LineBasicMaterial({ color: 0x00F3FF, opacity: 0.4 }); // Blue for all
+                    } else if (child.isMesh) {
+                        // Solid fill
+                        child.visible = false; // Hide solids usually to keep it wireframe-y, or make them very dim
+                        if(isActive && key !== 'all') {
+                            child.visible = true;
+                            child.material = new THREE.MeshBasicMaterial({ color: 0x221100, wireframe: true, transparent:true, opacity: 0.1 });
+                        }
+                    }
+                });
+            });
+        }
+
+        // Initial Active State
+        activateModule('all', menuContainer.children[0]);
+
+        // --- 5. ANIMATION LOOP ---
+        let isDragging = false;
+        let prevMouseX = 0;
+
+        // Inputs
+        document.addEventListener('mousedown', e => { if(!e.target.closest('#top-menu') && !e.target.closest('#bottom-panel')) isDragging = true; prevMouseX = e.clientX; });
+        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mousemove', e => {
+            if(isDragging) {
+                masterGroup.rotation.y += (e.clientX - prevMouseX) * 0.005;
+                prevMouseX = e.clientX;
+            }
+        });
+        // Touch
+        document.addEventListener('touchstart', e => { if(!e.target.closest('#top-menu') && !e.target.closest('#bottom-panel')) isDragging = true; prevMouseX = e.touches[0].clientX; });
+        document.addEventListener('touchend', () => isDragging = false);
+        document.addEventListener('touchmove', e => {
+            if(isDragging) {
+                masterGroup.rotation.y += (e.touches[0].clientX - prevMouseX) * 0.005;
+                prevMouseX = e.touches[0].clientX;
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate
+            if(!isDragging) masterGroup.rotation.y += 0.002;
+
+            // Camera Smooth Move (Lerp)
+            currentY += (targetY - currentY) * 0.1;
+            currentZoom += (targetZoom - currentZoom) * 0.1;
+
+            camera.position.set(currentZoom, currentY + 10, currentZoom);
+            camera.lookAt(0, currentY, 0);
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
+
