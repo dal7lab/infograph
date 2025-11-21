@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BERKLEY: KINETIC MASTERPIECE</title>
+    <!-- Load Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+        :root {
+            --bg-color: #020204;
+            --panel-bg: rgba(5, 8, 12, 0.97);
+            --cyan: #00f3ff;
+            --gold: #ffaa00;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: var(--bg-color); overflow: hidden; font-family: 'Noto Sans KR', sans-serif; }
+        
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; cursor: move; }
+        
+        /* Engineering Grid */
+        .cad-grid {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* UI Layer */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+
+        /* Top Bar */
+        .top-bar {
+            pointer-events: auto; height: 55px; background: var(--panel-bg);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex; align-items: center; padding: 0 15px; gap: 6px;
+            overflow-x: auto; white-space: nowrap;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+        }
+        .top-bar::-webkit-scrollbar { display: none; }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.02); 
+            border: 1px solid #333; 
+            color: #888;
+            font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 12px;
+            padding: 8px 14px; cursor: pointer; transition: all 0.3s;
+            text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0;
+            border-radius: 2px;
+        }
+        .nav-btn:hover { color: #fff; border-color: #fff; }
+        .nav-btn.active {
+            background: rgba(255, 255, 255, 0.1); 
+            color: #fff; 
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(255,255,255,0.15);
+        }
+
+        /* Bottom Panel (Extended for detailed text) */
+        .bottom-panel {
+            pointer-events: auto; height: 30vh; background: var(--panel-bg);
+            border-top: 3px solid var(--cyan);
+            display: flex; flex-direction: column;
+            backdrop-filter: blur(15px);
+            transition: border-color 0.3s;
+        }
+
+        .panel-header {
+            padding: 12px 25px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: baseline;
+            background: linear-gradient(90deg, rgba(255,255,255,0.03), transparent);
+        }
+
+        .mod-id { font-family: 'Rajdhani'; font-weight: 700; font-size: 13px; letter-spacing: 2px; margin-right: 10px; opacity: 0.8; }
+        .mod-title { font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: -0.5px; }
+
+        .panel-body {
+            flex: 1; padding: 25px; overflow-y: auto;
+            font-size: 13px; line-height: 1.8; color: #ccc; text-align: justify;
+            word-break: keep-all;
+        }
+        .panel-body h4 { 
+            margin: 25px 0 10px 0; border-left: 3px solid #777; padding-left: 12px; 
+            letter-spacing: -0.3px; color: #fff; font-size: 15px; font-weight: 700; 
+        }
+        .panel-body h4:first-child { margin-top: 0; }
+        .panel-body p { margin-bottom: 15px; }
+        .panel-body ul { margin: 10px 0 20px 0; padding-left: 20px; background: rgba(255,255,255,0.02); padding: 15px 15px 15px 35px; border-radius: 4px; }
+        .panel-body li { margin-bottom: 8px; color: #bbb; }
+        .panel-body strong { color: #fff; font-weight: 600; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #888; }
+    </style>
+</head>
+<body>
+
+    <div class="cad-grid"></div>
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="top-bar" id="menu-container"></div>
+        <div class="bottom-panel" id="info-panel">
+            <div class="panel-header">
+                <div>
+                    <span class="mod-id" id="ui-id" style="color:#fff">SYS.INIT</span>
+                    <span class="mod-title" id="ui-title" style="color:#fff">KINETIC ENGINE READY</span>
+                </div>
+            </div>
+            <div class="panel-body" id="ui-desc">
+                초정밀 기계식 시뮬레이션 엔진이 가동되었습니다. 상단 메뉴를 통해 각 부품의 유기적인 움직임과 상세 공학 정보를 확인하십시오.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. COLOR PALETTE & DEEP DATA ---
+        const COLORS = {
+            ALL: 0xffffff, BASE: 0x4a6fa5, CHINESE: 0x00ff88, TOURB: 0xff0055, 
+            CHIME: 0xffaa00, SKY: 0x9933ff, MOON: 0xe0e0e0, RETRO: 0xccff00, 
+            SPLIT: 0x0088ff, EQ: 0xff00ff, PERP: 0x00aaaa, SUN: 0xff5500, 
+            WORLD: 0x00ffff, ALARM: 0xcd7f32, SEL: 0x888888
+        };
+
+        const modules = [
+            { 
+                id: "ALL", color: COLORS.ALL, t: "전체 조립 (Full Assembly)", 
+                d: `<h4>2,877개 부품의 유기적 결합체</h4>
+                이 시뮬레이션은 세계에서 가장 복잡한 시계, 'Les Cabinotiers - The Berkley Grand Complication'의 내부를 디지털 트윈으로 구현한 것입니다. 일반적인 그랜드 컴플리케이션 시계(약 600~800개 부품)의 4배에 달하는 2,877개의 부품이 50.55mm 두께의 케이스 안에 초고밀도로 집약되어 있습니다.
+                <h4>설계의 핵심: 샌드위치 구조와 양면성</h4>
+                이 거대한 기계 장치는 총 9개의 주요 기어 트레인 레이어로 구성된 '샌드위치 구조'를 띱니다. 각 층은 서로 다른 시간 척도(1초부터 19년까지)를 제어하며, 오차 범위 0.01mm 이내로 정밀하게 맞물려 있습니다. 
+                가장 큰 특징은 앞면과 뒷면을 모두 메인 다이얼로 활용한다는 점입니다. 이를 위해 무브먼트 중앙을 관통하는 '메인 드라이브 샤프트'가 존재하며, 이 샤프트는 양쪽 면에 동일한 토크를 전달하여 63개의 기능을 동시에 구동합니다.
+                <h4>동작 시각화 가이드</h4>
+                화면 중앙의 모델은 실제 작동 원리에 따라 회전합니다. 붉은색 투르비용은 1분 주기로 빠르게 회전하며, 녹색 캘린더 캠은 1년에 1회전하는 등 각 부품이 실제 기계적 속도 비율을 반영하여 움직이고 있습니다.`
+            },
+            { 
+                id: "BASE", color: COLORS.BASE, t: "베이스 칼리버 (Chassis)", 
+                d: `<h4>무브먼트의 척추: 동축 리버싱 기어 (Coaxial Reversing)</h4>
+                이 복잡한 시계를 지탱하는 메인 플레이트와 기초 구동부입니다. 이 모듈의 핵심 기술은 '역회전 방지'와 '양면 동기화'입니다.
+                일반적인 시계 구조에서 기어 축이 시계를 관통하면, 뒷면의 바늘은 반시계 방향(역방향)으로 회전하게 됩니다. 하지만 이 시계는 뒷면도 정규 다이얼로 사용해야 하므로 바늘이 시계 방향으로 돌아야 합니다.
+                이를 해결하기 위해 바쉐론 콘스탄틴의 엔지니어들은 중심축에 <strong>3개의 아이들러 기어(Idler Gear)</strong>로 구성된 리버싱 모듈을 설계했습니다. 이 기어들은 동력의 회전 벡터를 기계적으로 180도 반전시켜, 앞면과 뒷면의 핸즈가 모두 '정방향'으로 회전하도록 만듭니다.
+                <h4>토크 분산 설계 (Torque Distribution)</h4>
+                63개 기능이 동시에 작동할 때 발생하는 막대한 부하를 견디기 위해, 메인 스프링 배럴은 직렬이 아닌 병렬 및 분산 배치되어 있습니다. 특히 알람용 배럴과 시간 구동용 배럴을 물리적으로 분리하여, 알람이 울릴 때 시계의 정확도(진동각)가 떨어지는 현상을 원천적으로 차단했습니다.`
+            },
+            { 
+                id: "CHINESE", color: COLORS.CHINESE, t: "중국 태음태양력 (Lunisolar)", 
+                d: `<h4>불가능에 도전하다: 비정형 알고리즘의 물리적 구현</h4>
+                기계식 시계 역사상 최초로 구현된 중국 태음태양력 캘린더입니다. 그레고리력(양력)은 규칙적이지만, 음력은 달의 위상(29.53일)과 태양의 공전(365.24일)이 어긋나 규칙을 정의하기 매우 어렵습니다.
+                <h4>메톤 주기 캠 (Metonic Cycle Cam)</h4>
+                이 문제를 해결하기 위해 19년마다 달의 위상과 태양의 주기가 일치하는 <strong>'메톤 주기'</strong>를 사용합니다. 화면에 보이는 녹색의 거대한 불규칙 캠은 19년 동안의 데이터를 물리적으로 깎아낸 '기계식 메모리'입니다.
+                기계적 핑거(Feeler)가 이 캠의 굴곡(깊이)을 읽어내어, 19년 동안 총 7번 돌아오는 윤달(13번째 달)을 기계가 스스로 판단하고 달력에 삽입합니다. 하루의 오차도 허용하지 않는 이 캠의 가공 오차는 머리카락 굵기의 1/10 수준입니다.`
+            },
+            { 
+                id: "TOURBILLON", color: COLORS.TOURB, t: "3축 투르비용 (3-Axis Tourbillon)", 
+                d: `<h4>중력 제어의 정점: 아밀러리 스피어(Armillary Sphere)</h4>
+                단일 축이 아닌, 3개의 축으로 회전하는 구체형 투르비용입니다. 이 장치는 시계의 심장인 밸런스 휠을 중력의 영향으로부터 해방시킵니다.
+                <ul>
+                    <li><strong>제1축 (Inner Cage):</strong> 60초에 1회전하며 밸런스 휠을 직접 감쌉니다.</li>
+                    <li><strong>제2축 (Intermediate Cage):</strong> 24초에 1회전하며 제1축과 수직으로 교차합니다.</li>
+                    <li><strong>제3축 (Outer Cage):</strong> 8초에 1회전하며 전체 구조를 매우 빠른 속도로 회전시킵니다.</li>
+                </ul>
+                이 복합적인 3차원 회전 궤적은 시계가 주머니 속에서 어떤 각도로 기울어져 있든, 중력 가속도(G)가 밸런스 스프링에 미치는 편심 오차를 수학적 평균 '0'으로 수렴하게 만듭니다. 또한 내부에는 일반적인 평면 스프링이 아닌, 필립스 커브가 적용된 <strong>구형(Spherical) 헤어스프링</strong>이 탑재되어 동심원 호흡을 하며 등시성을 극대화합니다.`
+            },
+            { 
+                id: "CHIME", color: COLORS.CHIME, t: "웨스트민스터 차임 (Carillon)", 
+                d: `<h4>소리의 건축학: 5 공 & 5 해머</h4>
+                영국 런던 빅벤(Big Ben)의 종소리를 손목 위에서 완벽하게 재현하는 그랑 소너리(Grande Sonnerie) 메커니즘입니다.
+                일반적인 미닛 리피터가 2개의 공(Ding-Dong)을 사용하는 반면, 이 모델은 5개의 공(Gong)을 사용하여 C, D, E, F, G 5음계(Pentatonic Scale)를 연주합니다.
+                <h4>그랑 소너리 로직</h4>
+                사용자의 조작 없이도 매 시간, 매 15분마다 자동으로 4절로 구성된 웨스트민스터 멜로디를 연주합니다. 이를 위해 타종 전용 동력 배럴이 별도로 존재하며, 원심력을 이용한 <strong>사일런트 거버너(Silent Governor)</strong>가 타종 속도를 일정하게 제어합니다. 태엽이 풀려 힘이 약해져도 종소리 템포가 느려지지 않게 하는 핵심 기술입니다.`
+            },
+            { 
+                id: "SKY", color: COLORS.SKY, t: "성도 (Celestial Chart)", 
+                d: `<h4>항성시(Sidereal Time) 구동 시스템</h4>
+                사용자의 머리 위 밤하늘을 실시간으로 시뮬레이션하는 천문학 모듈입니다. 핵심은 '시간의 기준'이 다르다는 점입니다.
+                우리가 사용하는 태양시(하루 24시간)가 아닌, 별들이 지구를 한 바퀴 도는 시간인 <strong>23시간 56분 4초(항성시)</strong>를 기준으로 회전합니다. 이를 위해 메인 기어 트레인에서 분기된 별도의 감속 기어 세트가 365.25:366.25의 비율로 회전 속도를 미세하게 변환합니다.
+                두 개의 사파이어 디스크가 겹쳐져 있으며, 하판은 회전하고 상판은 고정되어 북반구의 별자리와 지평선을 입체적으로 투영합니다.`
+            },
+            { 
+                id: "MOON", color: COLORS.MOON, t: "정밀 문페이즈 (Precision Moon)", 
+                d: `<h4>1,027년의 약속: 초정밀 천문 기어</h4>
+                단순한 평면 디스크가 아닌, 입체적으로 회전하는 3D 구체를 통해 달의 위상을 보여줍니다.
+                일반적인 시계의 문페이즈는 59개의 이빨을 가진 기어를 사용하여 29.5일을 주기로 돕니다. 이는 실제 달의 주기(29.53059일)와 약 44분의 차이가 있어 2년 8개월마다 하루의 오차가 발생합니다.
+                하지만 이 시계는 <strong>135개 이빨을 가진 정밀 기어</strong>와 복합 감속 시스템을 통해 오차를 획기적으로 줄였습니다. 이론상 <strong>1,027년</strong>이 지나야 단 하루의 오차가 발생합니다. 화면의 은색 구체는 실제 달의 궤도 주기에 맞춰 아주 천천히 회전합니다.`
+            },
+            { 
+                id: "RETRO", color: COLORS.RETRO, t: "레트로그레이드 (Retrograde)", 
+                d: `<h4>순간 복귀의 미학: 랙 앤 스네일(Rack & Snail)</h4>
+                날짜 바늘이 31일에 도달하면 원을 그리며 도는 것이 아니라, 순식간에 1일로 점프하여 되돌아오는 기능입니다.
+                <ul>
+                    <li><strong>스네일 캠:</strong> 달팽이 모양의 캠이 31일 동안 천천히 회전하며 랙(Rack, 톱니막대)을 들어 올립니다.</li>
+                    <li><strong>순간 복귀:</strong> 31일 자정이 되는 순간, 랙이 캠의 절벽 구간으로 떨어집니다. 이때 스프링에 축적된 강력한 탄성 에너지가 방출되며 바늘이 1/100초 만에 1일로 튀어 돌아갑니다.</li>
+                    <li><strong>충격 제어:</strong> 이 강력한 타격이 정밀한 무브먼트에 손상을 주지 않도록, 미세한 실리콘 댐퍼 혹은 유체 저항 장치가 충격을 흡수합니다.</li>
+                </ul>`
+            },
+            { 
+                id: "SPLIT", color: COLORS.SPLIT, t: "스플릿 세컨드 (Split-Chrono)", 
+                d: `<h4>시간을 쪼개다: 라트라팡테(Rattrapante) 클러치</h4>
+                두 개의 시간을 동시에 측정하는 최고난도 크로노그래프 기술입니다. 두 개의 초침(메인 초침과 스플릿 초침)이 겹쳐서 회전하다가, 사용자가 버튼을 누르면 분리됩니다.
+                <h4>집게(Pincers) 브레이크 시스템</h4>
+                화면 중앙에 보이는 파란색 집게 모양의 부품이 핵심입니다. 버튼을 누르면 이 집게가 스플릿 초침 휠을 강제로 잡아 멈추게 하고, 메인 초침은 계속 진행합니다. 다시 버튼을 누르면, <strong>하트 캠(Heart Cam)</strong>의 매끄러운 경사면을 따라 휠이 미끄러지며 멈춰있던 초침이 순식간에 메인 초침을 따라잡아(Catch-up) 다시 합체합니다. 이 과정에서 마찰을 최소화하는 수평 클러치 휠의 정교함이 필수적입니다.`
+            },
+            { 
+                id: "EQ", color: COLORS.EQ, t: "균시차 (Equation of Time)", 
+                d: `<h4>지구 궤도의 시각화: 콩팥 모양 캠 (Kidney Cam)</h4>
+                진태양시(해시계)와 평균태양시(손목시계)의 오차를 보여주는 모듈입니다. 오차의 원인은 지구 공전 궤도가 타원형이고 자전축이 기울어져 있기 때문입니다.
+                이 수학적 오차(-16분 ~ +14분)를 계산하기 위해 1년에 1회전하는 <strong>'콩팥 모양(Kidney Shape)'</strong>의 비정형 캠을 사용합니다. 캠의 굴곡을 따라 레버가 움직이며 실시간으로 오차 값을 바늘에 전달합니다. 화면에서 핑크색으로 빛나는 콩팥 모양 부품이 바로 이 캠입니다.`
+            },
+            { 
+                id: "PERP", color: COLORS.PERP, t: "그레고리 만세력 (Perpetual)", 
+                d: `<h4>400년 기계식 컴퓨터</h4>
+                중국식 달력과 별개로, 서양의 그레고리력 윤년을 계산하는 모듈입니다.
+                단순히 4년 주기(48개월)만 계산하는 것이 아니라, 100년 단위의 평년 예외(2100년, 2200년, 2300년)와 400년 단위의 윤년 예외(2000년, 2400년)까지 계산하는 위성 기어(Satellite Gear)가 탑재되어 있습니다. 이 십자형 위성 기어가 100년에 한 번씩 회전하며 2499년까지 날짜 수정이 전혀 필요 없는 영구적인 달력을 구현합니다.`
+            },
+            { 
+                id: "SUN", color: COLORS.SUN, t: "일출/일몰 (Sunrise/Set)", 
+                d: `<h4>계절을 읽는 눈: 위도 캠 (Latitude Cam)</h4>
+                사용자가 위치한 특정 위도(Latitude)에 따라 매일 변하는 낮과 밤의 길이를 기계적으로 표시합니다.
+                핵심 부품은 '위도 캠'입니다. 특정 위도의 연간 태양 고도 데이터를 물리적으로 깎아낸 이 캠은 1년에 1회전하며, 일출/일몰 바늘의 가동 범위를 물리적으로 제한하거나 확장합니다. 이 캠은 마치 길쭉한 땅콩이나 '8'자 모양을 하고 있어 계절별 태양의 움직임을 모사합니다.`
+            },
+            { 
+                id: "WORLD", color: COLORS.WORLD, t: "월드타임 (World Time)", 
+                d: `<h4>24개 도시의 네트워크</h4>
+                전 세계 24개 시간대를 동시에 표시하는 디스크 시스템입니다.
+                24개 도시명이 적힌 외부 디스크와 24시간이 적힌 내부 디스크가 서로 다른 속도로 맞물려 돌아갑니다. 특히 24시간 링은 투명한 사파이어 글라스로 제작되어 있으며, 절반은 어둡게 틴팅(Tinting) 처리되어 있어 전 세계 어느 도시가 현재 밤인지 낮인지 직관적으로 확인할 수 있습니다. 화면에서는 시안색(Cyan)의 거대한 링으로 표현되었습니다.`
+            },
+            { 
+                id: "ALARM", color: COLORS.ALARM, t: "알람 (Alarm)", 
+                d: `<h4>독립 동력 타종 시스템</h4>
+                지정된 시간에 소리를 내는 알람 기능입니다. 알람이 울릴 때는 매우 많은 에너지가 소모됩니다. 만약 시계 구동용 태엽의 힘을 쓴다면 시계가 멈추거나 오차가 생길 수 있습니다.
+                이를 방지하기 위해 알람 모듈은 자신만의 독립적인 메인 스프링 배럴과 와인딩 기구를 가지고 있습니다. 트리거 레버가 설정된 시간에 도달하면 해머의 잠금을 해제하여 브론즈 컬러의 공을 타격합니다.`
+            },
+            { 
+                id: "SEL", color: COLORS.SEL, t: "기능 선택기 (Selector)", 
+                d: `<h4>컬럼 휠 변속기 (Column Wheel Transmission)</h4>
+                하나의 크라운(용두)으로 수많은 기능을 제어하기 위한 모드 전환 장치입니다.
+                크라운 버튼을 누를 때마다 중앙의 <strong>'컬럼 휠'</strong>이 한 칸씩 회전합니다. 성곽 모양의 기둥(Column)들이 각기 다른 레버를 밀거나 당겨서, 크라운의 회전력을 '와인딩 기어', '날짜 조정 기어', '시간 조정 기어' 중 하나로 물리적으로 연결합니다. 자동차의 수동 변속기와 매우 유사한 원리입니다.`
+            }
+        ];
+
+        // --- 2. THREE.JS ENGINE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 20, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.8;
+        controls.addEventListener('start', () => { controls.autoRotate = false; });
+
+        const masterGroup = new THREE.Group();
+        scene.add(masterGroup);
+
+        // --- 3. PROCEDURAL GEOMETRY & ANIMATION SETUP ---
+        // Material Factory
+        const matCache = {};
+        function getMats(colorHex) {
+            if(!matCache[colorHex]) {
+                matCache[colorHex] = {
+                    line: new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.8 }),
+                    mesh: new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.1, side: THREE.DoubleSide, wireframe: true }),
+                    solid: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.9 }) 
+                };
+            }
+            return matCache[colorHex];
+        }
+
+        const animatedParts = []; // Store parts for animation loop
+
+        // --- BUILD MODULES WITH KINETIC LOGIC ---
+        function createGearShape(radius, teeth) {
+            const shape = new THREE.Shape();
+            const steps = teeth * 2;
+            const angleStep = (Math.PI * 2) / steps;
+            for(let i=0; i<=steps; i++) {
+                const r = (i % 2 === 0) ? radius : radius * 0.85;
+                const a = i * angleStep;
+                if(i===0) shape.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+                else shape.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+            }
+            return shape;
+        }
+
+        function createKineticModule(key, yPos, color) {
+            const grp = new THREE.Group();
+            grp.position.y = yPos;
+            const mats = getMats(color);
+
+            // 1. Main Gear (Counter-rotating pair)
+            const g1Shape = createGearShape(10, 32);
+            const g1Geo = new THREE.ExtrudeGeometry(g1Shape, { depth: 0.5, bevelEnabled: false });
+            const g1Lines = new THREE.LineSegments(new THREE.EdgesGeometry(g1Geo, 15), mats.line);
+            g1Lines.rotation.x = Math.PI/2;
+            
+            // Add to animation list
+            animatedParts.push({ mesh: g1Lines, speed: 0.01, axis: 'z' }); // Rotate around Z (which is Up in local space)
+            grp.add(g1Lines);
+
+            // 2. Sub-Mechanisms per Type
+            if(key === 'TOURBILLON') {
+                // 3-Axis Nested Cages
+                const cage1 = new THREE.Group();
+                const geo1 = new THREE.EdgesGeometry(new THREE.SphereGeometry(5, 16, 8));
+                const mesh1 = new THREE.LineSegments(geo1, mats.line);
+                cage1.add(mesh1);
+
+                const cage2 = new THREE.Group();
+                const geo2 = new THREE.EdgesGeometry(new THREE.SphereGeometry(3.5, 12, 6));
+                const mesh2 = new THREE.LineSegments(geo2, new THREE.LineBasicMaterial({color:0xffffff, opacity:0.5, transparent:true}));
+                cage2.add(mesh2);
+                cage1.add(cage2);
+
+                const cage3 = new THREE.Group(); // Inner
+                const geo3 = new THREE.EdgesGeometry(new THREE.BoxGeometry(2,2,2)); // Balance representation
+                const mesh3 = new THREE.LineSegments(geo3, mats.line);
+                cage3.add(mesh3);
+                cage2.add(cage3);
+
+                // Animation Logic for 3 axes
+                animatedParts.push({ mesh: cage1, speed: 0.02, axis: 'y' }); // Outer
+                animatedParts.push({ mesh: cage2, speed: 0.05, axis: 'x' }); // Middle
+                animatedParts.push({ mesh: cage3, speed: 0.1, axis: 'z' });  // Inner
+
+                grp.add(cage1);
+
+            } else if (key === 'CHINESE' || key === 'EQ' || key === 'SUN') {
+                // Irregular Cam (Slow rotation)
+                const camShape = new THREE.Shape();
+                for(let i=0; i<=50; i++) {
+                    const a = (i/50)*Math.PI*2;
+                    const r = 5 + Math.sin(a*3)*1.5 + Math.cos(a*5)*0.5; // Complex shape
+                    if(i===0) camShape.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+                    else camShape.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+                }
+                const camGeo = new THREE.ExtrudeGeometry(camShape, {depth:0.5, bevelEnabled:false});
+                const cam = new THREE.LineSegments(new THREE.EdgesGeometry(camGeo), mats.line);
+                cam.rotation.x = Math.PI/2; cam.position.y = 1;
+                
+                animatedParts.push({ mesh: cam, speed: 0.002, axis: 'z' }); // Very slow year cycle
+                grp.add(cam);
+
+            } else if (key === 'SKY' || key === 'WORLD') {
+                // Rotating Dome/Ring
+                const geo = key === 'SKY' ? new THREE.IcosahedronGeometry(6, 1) : new THREE.TorusGeometry(12, 1, 2, 48);
+                const wire = new THREE.WireframeGeometry(geo);
+                const mesh = new THREE.LineSegments(wire, mats.line);
+                if(key === 'WORLD') mesh.rotation.x = Math.PI/2;
+                
+                animatedParts.push({ mesh: mesh, speed: 0.001, axis: 'y' }); // Sidereal/Earth rotation
+                grp.add(mesh);
+
+            } else if (key === 'SPLIT' || key === 'CHIME') {
+                // Fast interaction parts (Hammers/Clutches) - Simulated by oscillating parts
+                const leverGeo = new THREE.BoxGeometry(1, 8, 1);
+                const lever = new THREE.LineSegments(new THREE.EdgesGeometry(leverGeo), mats.line);
+                lever.position.x = 6;
+                // We'll use a custom animation function for oscillation later
+                animatedParts.push({ mesh: lever, type: 'oscillate', speed: 0.05, range: 0.5 });
+                grp.add(lever);
+            } else {
+                // Default: Secondary Gear rotating opposite
+                const g2Shape = createGearShape(6, 20);
+                const g2Geo = new THREE.ExtrudeGeometry(g2Shape, {depth:0.4, bevelEnabled:false});
+                const g2 = new THREE.LineSegments(new THREE.EdgesGeometry(g2Geo), mats.line);
+                g2.rotation.x = Math.PI/2; g2.position.y = 0.8; g2.position.x = 8;
+                
+                animatedParts.push({ mesh: g2, speed: -0.02, axis: 'z' }); // Counter-rotate
+                grp.add(g2);
+            }
+
+            // Static Pillar
+            const pillar = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-2,0), new THREE.Vector3(0,2,0)]), mats.line);
+            grp.add(pillar);
+
+            return grp;
+        }
+
+        // Build Assembly
+        const module3DObjects = {};
+        const ySpacing = 3.0;
+        
+        modules.forEach((m, i) => {
+            if(m.id !== 'ALL') {
+                const y = (i - 7) * ySpacing;
+                const obj = createKineticModule(m.id, y, m.color);
+                module3DObjects[m.id] = obj;
+                masterGroup.add(obj);
+            }
+        });
+
+        // Central Shaft
+        const shaft = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.CylinderGeometry(1, 1, 50, 8)), new THREE.LineBasicMaterial({color:0x444444}));
+        animatedParts.push({ mesh: shaft, speed: 0.01, axis: 'y' });
+        masterGroup.add(shaft);
+
+        // --- 4. INTERACTION ---
+        const nav = document.getElementById('menu-container');
+        const pId = document.getElementById('ui-id');
+        const pTitle = document.getElementById('ui-title');
+        const pDesc = document.getElementById('ui-desc');
+        const bottomPanel = document.getElementById('info-panel');
+
+        let targetControlsY = 0;
+
+        modules.forEach((m, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'nav-btn';
+            btn.innerText = m.id === 'ALL' ? "전체" : m.t.split(' (')[0];
+            const hexStr = '#' + m.color.toString(16).padStart(6, '0');
+            btn.style.borderLeft = `3px solid ${hexStr}`;
+            btn.onclick = () => activate(idx, btn);
+            nav.appendChild(btn);
+        });
+
+        function activate(idx, btn) {
+            const data = modules[idx];
+            const hexColor = '#' + data.color.toString(16).padStart(6, '0');
+
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.backgroundColor = 'transparent';
+                b.style.color = '#888';
+            });
+            if(btn) {
+                btn.classList.add('active');
+                btn.style.color = hexColor;
+                btn.style.backgroundColor = `${hexColor}11`;
+                btn.style.borderColor = hexColor;
+            }
+
+            pId.innerText = data.id; pId.style.color = hexColor;
+            pTitle.innerText = data.t; pTitle.style.color = hexColor;
+            pDesc.innerHTML = data.d;
+            bottomPanel.style.borderTopColor = hexColor;
+            // Scroll text to top
+            pDesc.scrollTop = 0;
+
+            if(data.id === 'ALL') {
+                targetControlsY = 0;
+                Object.values(module3DObjects).forEach(obj => {
+                    obj.visible = true;
+                    obj.traverse(c => { if(c.material) c.material.opacity = 0.8; });
+                });
+            } else {
+                const target = module3DObjects[data.id];
+                targetControlsY = target.position.y;
+                
+                Object.keys(module3DObjects).forEach(k => {
+                    const obj = module3DObjects[k];
+                    const isActive = (k === data.id);
+                    obj.traverse(c => { 
+                        if(c.material) c.material.opacity = isActive ? 1.0 : 0.05; 
+                    });
+                });
+            }
+        }
+
+        activate(0, nav.firstChild);
+
+        // --- 5. ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+
+            controls.update();
+            controls.target.y += (targetControlsY - controls.target.y) * 0.05;
+
+            // Kinetic Animation Logic
+            animatedParts.forEach(part => {
+                if(part.type === 'oscillate') {
+                    // Pendulum/Lever motion
+                    part.mesh.rotation.z = Math.sin(time * 2) * part.range;
+                } else {
+                    // Continuous Rotation
+                    if(part.axis === 'x') part.mesh.rotation.x += part.speed;
+                    if(part.axis === 'y') part.mesh.rotation.y += part.speed;
+                    if(part.axis === 'z') part.mesh.rotation.z += part.speed;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
+
